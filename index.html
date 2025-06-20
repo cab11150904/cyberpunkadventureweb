@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberpunk Adventure</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background for cyberpunk feel */
+            color: #e2e8f0; /* Light text color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #2d3748; /* Slightly lighter dark background for the container */
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5); /* Deep shadow */
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .game-output {
+            background-color: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-wrap: break-word; /* Break long words */
+            color: #90cdf4; /* Light blue for terminal feel */
+            font-size: 0.95rem;
+            line-height: 1.5;
+            scrollbar-width: thin;
+            scrollbar-color: #4a5568 #2d3748;
+        }
+        .game-output::-webkit-scrollbar {
+            width: 8px;
+        }
+        .game-output::-webkit-scrollbar-track {
+            background: #2d3748;
+            border-radius: 10px;
+        }
+        .game-output::-webkit-scrollbar-thumb {
+            background-color: #4a5568;
+            border-radius: 10px;
+            border: 2px solid #2d3748;
+        }
+        .game-input-container {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .game-input {
+            flex-grow: 1;
+            background-color: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #e2e8f0;
+            font-size: 1rem;
+            outline: none;
+        }
+        .game-input:focus {
+            border-color: #63b3ed;
+            box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.5);
+        }
+        .send-button {
+            background-color: #4299e1; /* Blue button */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .send-button:hover {
+            background-color: #3182ce;
+            transform: translateY(-1px);
+        }
+        .send-button:active {
+            background-color: #2b6cb0;
+            transform: translateY(0);
+        }
+        .send-button:disabled {
+            background-color: #4a5568;
+            cursor: not-allowed;
+            opacity: 0.7;
+            box-shadow: none;
+        }
+        .loading-indicator {
+            text-align: center;
+            color: #90cdf4;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .game-container {
+                padding: 1rem;
+                border-radius: 0.5rem;
+            }
+            .game-output {
+                min-height: 250px;
+                font-size: 0.85rem;
+            }
+            .game-input {
+                font-size: 0.9rem;
+                padding: 0.6rem 0.8rem;
+            }
+            .send-button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl font-bold text-center text-teal-300 mb-4">NEON NEXUS: A Cyberpunk Adventure</h1>
+        <div id="gameOutput" class="game-output">
+            <p>Initializing neural interface...</p>
+        </div>
+        <div id="loadingIndicator" class="loading-indicator hidden">
+            Processing neural pathways... please wait.
+        </div>
+        <div class="game-input-container">
+            <input type="text" id="gameInput" class="game-input" placeholder="Type your command here (e.g., 'look around', 'talk to [NPC Name]', 'examine [item]', 'hack [system]')...">
+            <button id="sendButton" class="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state variables
+        let gameHistory = []; // Stores the narrative output for display
+        let isProcessing = false; // To prevent multiple requests
+
+        // DOM elements
+        const gameOutputElement = document.getElementById('gameOutput');
+        const gameInputElement = document.getElementById('gameInput');
+        const sendButtonElement = document.getElementById('sendButton');
+        const loadingIndicatorElement = document.getElementById('loadingIndicator');
+
+        // Initial game context for Gemini
+        const initialGameContext = `You are playing a text-based adventure game set in a dystopian cyberpunk city called Neo-Veridia. It's year 2077. Technology is pervasive, mega-corporations rule, and the streets are a mix of neon-lit skyscrapers and grim, rain-slicked alleyways. You are a street-level operative, known as a 'Runner', making a living on the fringes.
+
+Your starting location is the 'Glitch Gulch' district, a seedy, rundown area known for black markets and shady dealings.
+
+Your goal is to survive, unravel mysteries, and maybe even find a way to escape the city's iron grip.
+
+Provide an initial description of your surroundings, present a clear problem or opportunity, and offer 2-3 distinct, open-ended choices for the player to make. Make sure the choices are verbs or short phrases. Do NOT include phrases like "What do you do?" or "Your choices are:". Just provide the choices directly in a numbered list, like "1. Investigate the noise." or "2. Head to the market."
+`;
+
+        /**
+         * Appends text to the game output area.
+         * @param {string} text The text to append.
+         * @param {string} type Optional. 'player' for player input, 'ai' for AI response.
+         */
+        function appendToOutput(text, type = 'ai') {
+            const p = document.createElement('p');
+            p.classList.add('mb-2'); // Add some margin bottom for spacing
+            if (type === 'player') {
+                p.classList.add('text-green-300', 'font-semibold'); // Style player input
+                p.textContent = `> ${text}`; // Prepend with a command prompt
+            } else {
+                p.classList.add('text-blue-200'); // Default AI text color
+                // Convert numbered lists from AI to HTML list items if needed
+                const lines = text.split('\n');
+                let inList = false;
+                lines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    if (/^\d+\.\s/.test(trimmedLine)) {
+                        if (!inList) {
+                            const ul = document.createElement('ul');
+                            ul.classList.add('list-decimal', 'list-inside', 'ml-4');
+                            p.appendChild(ul);
+                            inList = true;
+                        }
+                        const li = document.createElement('li'); // Corrected: create <li> element
+                        li.textContent = trimmedLine.replace(/^\d+\.\s/, ''); // Remove number
+                        p.querySelector('ul').appendChild(li);
+                    } else {
+                        if (inList) {
+                            gameOutputElement.appendChild(p); // Append previous list
+                            p = document.createElement('p'); // New paragraph for non-list text
+                            p.classList.add('mb-2', 'text-blue-200');
+                            inList = false;
+                        }
+                        // Check if the current paragraph is empty before appending a new line
+                        if (p.textContent.trim() !== '' || line.trim() !== '') {
+                            p.appendChild(document.createTextNode(line + '\n')); // Append text and newline
+                        }
+                    }
+                });
+            }
+            gameOutputElement.appendChild(p);
+            // Scroll to the bottom
+            gameOutputElement.scrollTop = gameOutputElement.scrollHeight;
+        }
+
+        /**
+         * Sends a prompt to the Gemini API and handles the response.
+         * @param {string} prompt The text prompt to send to Gemini.
+         * @returns {Promise<string>} A promise that resolves with the generated text.
+         */
+        async function getGeminiResponse(prompt) {
+            isProcessing = true;
+            sendButtonElement.disabled = true;
+            gameInputElement.disabled = true;
+            loadingIndicatorElement.classList.remove('hidden'); // Show loading indicator
+
+            let chatHistory = [];
+            // Add previous interaction context for better coherence
+            if (gameHistory.length > 0) {
+                // Limit history to a few turns to manage token usage
+                // Adjust this number based on desired context length and token limits
+                const historyToInclude = gameHistory.slice(Math.max(0, gameHistory.length - 8)); // Include more turns for context
+                historyToInclude.forEach(entry => {
+                    chatHistory.push({ role: entry.type === 'player' ? 'user' : 'model', parts: [{ text: entry.text }] });
+                });
+            }
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // API key is handled by the Canvas environment automatically
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                    throw new Error(`API request failed with status ${response.status}: ${errorData.error.message}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    return text;
+                } else {
+                    console.warn('Gemini API response format unexpected:', result);
+                    return "Error: Could not generate a response. Please try again or rephrase.";
+                }
+            } catch (error) {
+                console.error("Error fetching from Gemini API:", error);
+                return `An error occurred: ${error.message}. Please try again.`;
+            } finally {
+                isProcessing = false;
+                sendButtonElement.disabled = false;
+                gameInputElement.disabled = false;
+                loadingIndicatorElement.classList.add('hidden'); // Hide loading indicator
+                gameInputElement.focus(); // Focus input after response
+            }
+        }
+
+        /**
+         * Handles player input and updates the game state.
+         * @param {string} command The command entered by the player.
+         */
+        async function handleCommand(command) {
+            if (isProcessing) return; // Prevent input if already processing
+
+            appendToOutput(command, 'player');
+            gameHistory.push({ text: command, type: 'player' });
+            gameInputElement.value = ''; // Clear input field
+
+            let aiResponse = "";
+            let newPrompt = "";
+
+            // Check for specific commands
+            if (command.toLowerCase().startsWith('talk to ')) {
+                const parts = command.substring('talk to '.length).trim().split(' about ');
+                const npcName = parts[0];
+                const topic = parts.length > 1 ? parts[1] : '';
+
+                newPrompt = `The player wants to talk to ${npcName}. ${topic ? `They asked about "${topic}".` : 'Initiate a dialogue.'} Respond as ${npcName} would in a cyberpunk setting, and then provide 2-3 distinct, open-ended choices for the player's next action in the game (not necessarily just conversation options). Always present choices in a numbered list.`;
+
+            } else if (command.toLowerCase().startsWith('examine ')) {
+                const itemName = command.substring('examine '.length).trim();
+                newPrompt = `The player wants to examine "${itemName}". Provide a detailed, unique description of this item in the cyberpunk world, including its appearance, possible function, and any lore or context. Then, offer 2-3 distinct, open-ended choices for the player's next action. Always present choices in a numbered list.`;
+
+            } else if (command.toLowerCase().startsWith('hack ')) {
+                const systemName = command.substring('hack '.length).trim();
+                newPrompt = `The player wants to hack into "${systemName}". Describe the hacking process, any challenges or security measures encountered, the outcome of the hack (success, partial success, or failure), and what information or access they gain (or fail to gain). Then, offer 2-3 distinct, open-ended choices for the player's next action. Always present choices in a numbered list.`;
+
+            } else {
+                // Default adventure continuation
+                newPrompt = `The player's last action was: "${command}". Based on this, continue the cyberpunk adventure. Describe the new situation, any immediate consequences, and offer 2-3 distinct, open-ended choices for the player to make next. Always present choices in a numbered list format (e.g., "1. Choice A", "2. Choice B"). Make sure the choices are verbs or short phrases. Do NOT include phrases like "What do you do?" or "Your choices are:".`;
+            }
+
+            aiResponse = await getGeminiResponse(newPrompt);
+            appendToOutput(aiResponse, 'ai');
+            gameHistory.push({ text: aiResponse, type: 'ai' });
+        }
+
+        // Event listeners
+        sendButtonElement.addEventListener('click', () => {
+            const command = gameInputElement.value.trim();
+            if (command) {
+                handleCommand(command);
+            }
+        });
+
+        gameInputElement.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                const command = gameInputElement.value.trim();
+                if (command) {
+                    handleCommand(command);
+                }
+            }
+        });
+
+        // Initialize the game
+        async function initGame() {
+            appendToOutput("Welcome to Neo-Veridia...", 'ai');
+            const initialDescription = await getGeminiResponse(initialGameContext);
+            appendToOutput(initialDescription, 'ai');
+            gameHistory.push({ text: initialDescription, type: 'ai' });
+        }
+
+        // Start the game on window load
+        window.onload = function () {
+            initGame();
+        }
+    </script>
+</body>
+</html>
